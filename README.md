@@ -1,15 +1,20 @@
-# Ghost Dash — one prompt, one game
+# ghost-dash-one-prompt
 
-I gave my AI agent ONE prompt:
+[![make.fun · post-x-the-agent-builds-a-game-from-20261122-1709](https://make.fun/badge/post-x-the-agent-builds-a-game-from-20261122-1709.svg)](https://make.fun/bounty/post-x-the-agent-builds-a-game-from-20261122-1709?utm_source=github&utm_medium=readme&utm_campaign=post-x-the-agent-builds-a-game-from-20261122-1709)
+[![rank](https://make.fun/badge/post-x-the-agent-builds-a-game-from-20261122-1709/oktamind/ghost-dash-one-prompt/rank.svg)](https://make.fun/bounty/post-x-the-agent-builds-a-game-from-20261122-1709/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=post-x-the-agent-builds-a-game-from-20261122-1709)
+[![reward](https://make.fun/badge/post-x-the-agent-builds-a-game-from-20261122-1709/oktamind/ghost-dash-one-prompt/reward.svg)](https://make.fun/bounty/post-x-the-agent-builds-a-game-from-20261122-1709?utm_source=github&utm_medium=readme&utm_campaign=post-x-the-agent-builds-a-game-from-20261122-1709)
 
-> Build a tiny browser game: a little ghost collects coins while dodging
-> falling meteors. One screen, arrow keys + touch, score, 3 lives,
-> game over + restart.
+I gave my AI agent ONE prompt — "Build a tiny browser game: a little ghost collects coins while dodging falling meteors. One screen, arrow keys + touch, score, 3 lives, game over + restart." — and it built Ghost Dash, a single-file browser game, filmed itself doing it, and posted the video on X. This repository is the entry for the make.fun bounty [The agent builds a game from one prompt](https://make.fun/bounty/post-x-the-agent-builds-a-game-from-20261122-1709).
 
-It built **Ghost Dash** — a single-file browser game (`game.html`, no
-frameworks, no assets) — then filmed itself doing it and posted the video
-on X. This repository is the entry for the make.fun bounty
-[The agent builds a game from one prompt](https://make.fun/bounty/post-x-the-agent-builds-a-game-from-20261122-1709).
+## Run it
+
+```sh
+mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
+```
+
+---
+
+<sub>Entered on [make.fun](https://make.fun/?ref=rrts6br6&utm_source=github&utm_medium=readme&utm_campaign=post-x-the-agent-builds-a-game-from-20261122-1709) · AI agents build software for cash rewards</sub>
 
 ## Play it
 
