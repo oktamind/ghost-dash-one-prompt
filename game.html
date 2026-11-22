@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Ghost Dash — one prompt, one game</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0d0b1e; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; }
+  #wrap { position: relative; width: min(100vw, 56.25vh); aspect-ratio: 9 / 16; }
+  canvas { width: 100%; height: 100%; display: block; border-radius: 12px;
+           background: linear-gradient(#171233, #0d0b1e 70%); touch-action: none; }
+  #hint { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center;
+          color: #9d94d6; font-size: 13px; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="540" height="960"></canvas>
+  <div id="hint">← → / drag to move &nbsp;•&nbsp; R to restart</div>
+</div>
+<script>
+'use strict';
+// Ghost Dash — built from ONE prompt:
+// "Build a tiny browser game: a little ghost collects coins while dodging
+//  falling meteors. One screen, arrow keys + touch, score, 3 lives,
+//  game over + restart."
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+const W = 540, H = 960;
+
+const state = {
+  mode: 'start', // start | play | over
+  score: 0, lives: 3, time: 0,
+  ghost: { x: W / 2, y: H - 170, r: 34, vx: 0, inv: 0 },
+  coins: [], meteors: [], stars: [],
+  spawnCoin: 0, spawnMeteor: 0,
+};
+for (let i = 0; i < 70; i++)
+  state.stars.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.8 + 0.4, tw: Math.random() * 6.28 });
+
+const keys = {};
+addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault();
+  if ((e.key === 'r' || e.key === 'R') && state.mode === 'over') reset();
+  if (e.key === ' ' || e.key === 'Enter') start();
+});
+addEventListener('keyup', e => { keys[e.key] = false; });
+
+let pointerX = null;
+cv.addEventListener('pointerdown', e => { pointerX = pointerXOf(e); start(); });
+cv.addEventListener('pointermove', e => { if (pointerX !== null) pointerX = pointerXOf(e); });
+addEventListener('pointerup', () => { pointerX = null; });
+function pointerXOf(e) {
+  const r = cv.getBoundingClientRect();
+  return (e.clientX - r.left) / r.width * W;
+}
+
+function start() { if (state.mode !== 'play') { reset(); state.mode = 'play'; } }
+function reset() {
+  state.mode = 'start'; state.score = 0; state.lives = 3; state.time = 0;
+  state.ghost.x = W / 2; state.ghost.inv = 0;
+  state.coins = []; state.meteors = [];
+}
+
+function spawnCoin() {
+  state.coins.push({ x: 40 + Math.random() * (W - 80), y: -30, r: 16, vy: 150 + Math.random() * 60, spin: Math.random() * 6.28 });
+}
+function spawnMeteor() {
+  const speed = 260 + Math.min(260, state.score * 4) + Math.random() * 120;
+  state.meteors.push({ x: 40 + Math.random() * (W - 80), y: -40, r: 22 + Math.random() * 14,
+                       vy: speed, vx: (Math.random() - 0.5) * 90, rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 3 });
+}
+
+function update(dt) {
+  if (state.mode !== 'play') return;
+  state.time += dt;
+  const g = state.ghost;
+  const speed = 420;
+  if (keys.ArrowLeft || keys.a) g.x -= speed * dt;
+  if (keys.ArrowRight || keys.d) g.x += speed * dt;
+  if (pointerX !== null) g.x += (pointerX - g.x) * Math.min(1, dt * 14);
+  g.x = Math.max(40, Math.min(W - 40, g.x));
+  if (g.inv > 0) g.inv -= dt;
+
+  state.spawnCoin -= dt; state.spawnMeteor -= dt;
+  if (state.spawnCoin <= 0) { spawnCoin(); state.spawnCoin = 0.55 + Math.random() * 0.5; }
+  if (state.spawnMeteor <= 0) { spawnMeteor(); state.spawnMeteor = Math.max(0.35, 0.95 - state.score * 0.012); }
+
+  for (const c of state.coins) { c.y += c.vy * dt; c.spin += dt * 5; }
+  for (const m of state.meteors) { m.y += m.vy * dt; m.x += m.vx * dt; m.rot += m.vr * dt; }
+  state.coins = state.coins.filter(c => c.y < H + 40);
+  state.meteors = state.meteors.filter(m => m.y < H + 60);
+
+  for (const c of state.coins) {
+    const dx = c.x - g.x, dy = c.y - g.y;
+    if (dx * dx + dy * dy < (c.r + g.r - 8) * (c.r + g.r - 8)) { c.y = H + 999; state.score += 1; }
+  }
+  state.coins = state.coins.filter(c => c.y < H + 40);
+  for (const m of state.meteors) {
+    const dx = m.x - g.x, dy = m.y - g.y;
+    if (g.inv <= 0 && dx * dx + dy * dy < (m.r + g.r - 10) * (m.r + g.r - 10)) {
+      m.y = H + 999; state.lives -= 1; g.inv = 1.6;
+      if (state.lives <= 0) state.mode = 'over';
+    }
+  }
+  state.meteors = state.meteors.filter(m => m.y < H + 60);
+}
+
+function drawGhost(x, y, r, bob) {
+  ctx.save();
+  ctx.translate(x, y + Math.sin(bob) * 5);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(0, -r * 0.15, r, Math.PI, 0);
+  ctx.lineTo(r, r * 0.55);
+  const waves = 3, w = (2 * r) / waves;
+  for (let i = 0; i < waves; i++)
+    ctx.arc(r - w * (i + 0.5), r * 0.55, w / 2, 0, Math.PI, i % 2 === 0);
+  ctx.lineTo(-r, -r * 0.15);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#191419';
+  ctx.beginPath(); ctx.arc(-r * 0.36, -r * 0.2, r * 0.16, 0, 6.29); ctx.fill();
+  ctx.beginPath(); ctx.arc(r * 0.36, -r * 0.2, r * 0.16, 0, 6.29); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, r * 0.22, r * 0.13, r * 0.2, 0, 0, 6.29); ctx.fill();
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  for (const s of state.stars) {
+    ctx.globalAlpha = 0.35 + 0.3 * Math.sin(state.time * 2 + s.tw);
+    ctx.fillStyle = '#cfc8ff';
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.29); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  for (const c of state.coins) {
+    ctx.save(); ctx.translate(c.x, c.y); ctx.scale(Math.abs(Math.cos(c.spin)) * 0.7 + 0.3, 1);
+    ctx.fillStyle = '#ffd23e';
+    ctx.beginPath(); ctx.arc(0, 0, c.r, 0, 6.29); ctx.fill();
+    ctx.fillStyle = '#b8860b';
+    ctx.font = 'bold 20px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('★', 0, 1);
+    ctx.restore();
+  }
+  for (const m of state.meteors) {
+    ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.rot);
+    ctx.fillStyle = '#8a7f8d';
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * 6.29, rr = m.r * (0.82 + 0.18 * Math.sin(i * 2.7));
+      ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ff7a1a';
+    ctx.beginPath(); ctx.arc(-m.r * 0.25, -m.r * 0.25, m.r * 0.22, 0, 6.29); ctx.fill();
+    ctx.restore();
+  }
+
+  const g = state.ghost;
+  if (!(g.inv > 0 && Math.floor(g.inv * 12) % 2 === 0)) drawGhost(g.x, g.y, g.r, state.time * 3);
+
+  ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.font = 'bold 30px system-ui, sans-serif';
+  ctx.fillText('SCORE ' + state.score, 22, 20);
+  ctx.fillStyle = '#ff5d8f'; ctx.font = 'bold 30px system-ui, sans-serif';
+  ctx.fillText('♥'.repeat(Math.max(0, state.lives)) + '♡'.repeat(Math.max(0, 3 - state.lives)), 22, 58);
+
+  if (state.mode === 'start') {
+    ctx.fillStyle = 'rgba(13,11,30,0.72)'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 64px system-ui, sans-serif';
+    ctx.fillText('GHOST DASH', W / 2, 330);
+    ctx.fillStyle = '#ffd23e'; ctx.font = 'bold 28px system-ui, sans-serif';
+    ctx.fillText('one prompt. one game.', W / 2, 410);
+    ctx.fillStyle = '#cfc8ff'; ctx.font = '26px system-ui, sans-serif';
+    ctx.fillText('Grab coins. Dodge meteors.', W / 2, 480);
+    ctx.fillText('3 lives. Good luck.', W / 2, 520);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 30px system-ui, sans-serif';
+    ctx.fillText('TAP OR PRESS SPACE TO PLAY', W / 2, 620);
+  }
+  if (state.mode === 'over') {
+    ctx.fillStyle = 'rgba(13,11,30,0.78)'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ff5d8f'; ctx.font = 'bold 62px system-ui, sans-serif';
+    ctx.fillText('GAME OVER', W / 2, 360);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 34px system-ui, sans-serif';
+    ctx.fillText('SCORE ' + state.score, W / 2, 450);
+    ctx.fillStyle = '#cfc8ff'; ctx.font = '26px system-ui, sans-serif';
+    ctx.fillText('Press R or tap to play again', W / 2, 520);
+  }
+}
+
+// Deterministic frames for capturing footage (?shot=start|play|over) and a
+// hands-free autopilot (?demo=1) so the game can be filmed playing itself.
+const params = new URLSearchParams(location.search);
+const shot = params.get('shot');
+if (shot === 'play') {
+  state.mode = 'play'; state.score = 12; state.lives = 2; state.time = 4.2;
+  state.coins = [
+    { x: 150, y: 300, r: 16, vy: 180, spin: 0.6 },
+    { x: 300, y: 480, r: 16, vy: 180, spin: 2.1 },
+    { x: 420, y: 220, r: 16, vy: 180, spin: 4.0 },
+    { x: 230, y: 640, r: 16, vy: 180, spin: 1.2 },
+  ];
+  state.meteors = [
+    { x: 120, y: 180, r: 30, vy: 300, vx: 20, rot: 0.5, vr: 0.4 },
+    { x: 380, y: 380, r: 26, vy: 320, vx: -15, rot: 2.0, vr: -0.3 },
+    { x: 470, y: 620, r: 34, vy: 280, vx: 10, rot: 1.1, vr: 0.2 },
+  ];
+  draw();
+} else if (shot === 'over') {
+  state.mode = 'over'; state.score = 27; state.lives = 0; state.time = 9.8;
+  draw();
+} else if (shot === 'start') {
+  draw();
+}
+if (params.get('demo') === '1') {
+  // Autopilot: drift toward the nearest coin, away from close meteors.
+  setInterval(() => {
+    if (state.mode !== 'play') { start(); return; }
+    const g = state.ghost;
+    let tx = g.x;
+    if (state.coins.length) {
+      let best = state.coins[0];
+      for (const c of state.coins) if (c.y > best.y) best = c;
+      tx = best.x;
+    }
+    for (const m of state.meteors)
+      if (m.y > g.y - 260 && m.y < g.y && Math.abs(m.x - g.x) < 90) tx = g.x + (m.x < g.x ? 130 : -130);
+    pointerX = Math.max(40, Math.min(W - 40, tx));
+  }, 90);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  update(dt); draw();
+  requestAnimationFrame(frame);
+}
+if (!shot) requestAnimationFrame(frame);
+</script>
+</body>
+</html>
